@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Teste · Tradutor ES ⇄ PT</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { margin: 0; font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    main { max-width: 720px; margin: 0 auto; padding: 24px 16px 400px; }
+    h2 { font-size: 15px; margin: 28px 0 8px; }
+    input, textarea, [contenteditable] {
+      display: block; width: 100%; box-sizing: border-box; font: inherit;
+      padding: 8px 10px; border: 1px solid #c7c7cc; border-radius: 8px;
+    }
+    textarea { min-height: 70px; }
+    [contenteditable] { min-height: 60px; }
+    .hint { color: #8e8e93; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Página de teste</h1>
+    <p class="hint">Seleciona uma frase e usa o menu de contexto «Traduzir «…»» ou Alt+Shift+T.</p>
+
+    <h2>Texto normal</h2>
+    <p id="p-es">No sé a qué hora envían alertas de CASAFARI, voy a preguntar o pedir que vuelvan a enviar las alertas.</p>
+    <p id="p-pt">Não sei a que horas enviam alertas da CASAFARI, vou perguntar ou pedir que reenviem os alertas.</p>
+
+    <h2>input</h2>
+    <input id="input" value="Hola, ¿cómo estás? Mañana tenemos la reunión con el cliente.">
+
+    <h2>textarea</h2>
+    <textarea id="textarea">Obrigado pela mensagem. Amanhã envio a proposta com os valores atualizados.</textarea>
+
+    <h2>contenteditable</h2>
+    <div id="editable" contenteditable="true">Buenos días, <b>gracias</b> por la información. Ya hablamos ahora.</div>
+
+    <h2>Fundo da página</h2>
+    <p class="hint">Desce até ao fim para testar o popover perto do rebordo.</p>
+  </main>
+  <footer style="position: fixed; bottom: 0; left: 0; right: 0; padding: 12px 16px; background: canvas; border-top: 1px solid #c7c7cc;">
+    <textarea id="chat" placeholder="Caixa de chat fixa no fundo">Não sei a que horas enviam alertas da CASAFARI, vou perguntar ou pedir que reenviem os alertas</textarea>
+  </footer>
+  <script src="harness.js"></script>
+</body>
+</html>

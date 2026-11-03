@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Tradutor ES ⇄ PT",
+  "version": "1.0.0",
+  "description": "Traduz o texto selecionado entre Espanhol e Português, no próprio dispositivo, como no Safari.",
+  "minimum_chrome_version": "138",
+  "permissions": ["contextMenus", "storage", "scripting", "offscreen"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["engine.js", "content.js"],
+      "all_frames": true,
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    { "resources": ["popover.css"], "matches": ["<all_urls>"] }
+  ],
+  "commands": {
+    "translate-selection": {
+      "suggested_key": { "default": "Alt+Shift+T" },
+      "description": "Traduzir o texto selecionado"
+    }
+  },
+  "options_page": "options.html",
+  "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" },
+  "action": { "default_title": "Tradutor ES ⇄ PT", "default_icon": { "16": "icons/16.png", "32": "icons/32.png" } }
+}
