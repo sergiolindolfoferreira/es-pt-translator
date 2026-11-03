@@ -5,6 +5,7 @@
 globalThis.EsPtEngine ??= (() => {
   const translators = new Map();
   const ptTargets = new Map();
+  const ptResolved = new Map();
   let detectorPromise = null;
 
   class EngineError extends Error {
@@ -29,13 +30,22 @@ globalThis.EsPtEngine ??= (() => {
         } catch {
           return 'pt';
         }
-      })());
+      })().then((code) => {
+        ptResolved.set(variant, code);
+        return code;
+      }));
     }
     return ptTargets.get(variant);
   }
 
   async function langCode(lang, ptVariant) {
     return lang === 'pt' ? resolvePt(ptVariant) : 'es';
+  }
+
+  // Versão síncrona (undefined se o código de português ainda não foi resolvido).
+  function langCodeSync(lang, ptVariant = 'pt-PT') {
+    if (lang !== 'pt') return 'es';
+    return ptVariant === 'pt' ? 'pt' : ptResolved.get(ptVariant);
   }
 
   // --- Deteção ---
@@ -94,36 +104,61 @@ globalThis.EsPtEngine ??= (() => {
     }
   }
 
-  // allowDownload só deve ser true dentro de um gesto do utilizador (o download exige-o).
-  async function getTranslator(source, target, { ptVariant, allowDownload = false, onProgress } = {}) {
-    if (!apiPresent()) throw new EngineError('api-missing', 'A Translator API não existe neste contexto.');
-    const sourceLanguage = await langCode(source, ptVariant);
-    const targetLanguage = await langCode(target, ptVariant);
+  function isGestureError(err) {
+    return err?.name === 'NotAllowedError' && /gesture|activation/i.test(err.message || '');
+  }
+
+  // O Chrome só deixa descarregar um modelo se create() for chamado durante o gesto do utilizador:
+  // entre o clique e esta chamada não pode haver nenhum await.
+  function createTranslator(sourceLanguage, targetLanguage, onProgress) {
     const key = `${sourceLanguage}>${targetLanguage}`;
     if (translators.has(key)) return translators.get(key);
-
-    const state = await availability(source, target, ptVariant);
-    if (state === 'blocked') throw new EngineError('blocked', 'Esta página bloqueia a Translator API.');
-    if (state === 'unavailable') throw new EngineError('unavailable', 'Este par de idiomas não está disponível neste dispositivo.');
-    if (state !== 'available' && !allowDownload) throw new EngineError('needs-download', 'O modelo de tradução ainda não foi descarregado.');
-
     const promise = Translator.create({
       sourceLanguage,
       targetLanguage,
       monitor(m) {
         if (onProgress) m.addEventListener('downloadprogress', (e) => onProgress(e.loaded));
       },
+    }).catch((err) => {
+      translators.delete(key);
+      if (isGestureError(err)) throw new EngineError('needs-download', err.message);
+      if (err?.name === 'NotAllowedError') throw new EngineError('blocked', err.message);
+      throw new EngineError('failed', err?.message);
     });
     translators.set(key, promise);
-    try {
-      return await promise;
-    } catch (err) {
-      translators.delete(key);
-      if (err?.name === 'NotAllowedError') {
-        throw new EngineError(state === 'available' ? 'blocked' : 'needs-download', err.message);
-      }
-      throw new EngineError('failed', err?.message);
+    return promise;
+  }
+
+  function createDetector(onProgress) {
+    const promise = LanguageDetector.create({
+      expectedInputLanguages: ['es', 'pt'],
+      monitor(m) {
+        if (onProgress) m.addEventListener('downloadprogress', (e) => onProgress(e.loaded));
+      },
+    });
+    detectorPromise = promise.catch(() => null);
+    return promise.catch((err) => {
+      throw new EngineError(isGestureError(err) ? 'needs-download' : 'failed', err?.message);
+    });
+  }
+
+  // allowDownload só deve ser true dentro de um gesto do utilizador.
+  async function getTranslator(source, target, { ptVariant, allowDownload = false, onProgress } = {}) {
+    if (!apiPresent()) throw new EngineError('api-missing', 'A Translator API não existe neste contexto.');
+    if (allowDownload) {
+      const s = langCodeSync(source, ptVariant);
+      const t = langCodeSync(target, ptVariant);
+      if (s && t) return createTranslator(s, t, onProgress);
     }
+    const sourceLanguage = await langCode(source, ptVariant);
+    const targetLanguage = await langCode(target, ptVariant);
+    if (translators.has(`${sourceLanguage}>${targetLanguage}`)) return translators.get(`${sourceLanguage}>${targetLanguage}`);
+
+    const state = await availability(source, target, ptVariant);
+    if (state === 'blocked') throw new EngineError('blocked', 'Esta página bloqueia a Translator API.');
+    if (state === 'unavailable') throw new EngineError('unavailable', 'Este par de idiomas não está disponível neste dispositivo.');
+    if (state !== 'available' && !allowDownload) throw new EngineError('needs-download', 'O modelo de tradução ainda não foi descarregado.');
+    return createTranslator(sourceLanguage, targetLanguage, onProgress);
   }
 
   async function translate(text, source, target, opts = {}) {
@@ -135,24 +170,15 @@ globalThis.EsPtEngine ??= (() => {
     }
   }
 
-  // Descarrega os dois sentidos e o detetor. Chamar dentro de um clique.
-  async function downloadAll({ ptVariant, onProgress } = {}) {
-    const parts = { 'es>pt': 0, 'pt>es': 0, detector: 0 };
-    const report = (k) => (v) => {
-      parts[k] = v;
-      onProgress?.((parts['es>pt'] + parts['pt>es'] + parts.detector) / 3);
-    };
-    const jobs = [
-      getTranslator('es', 'pt', { ptVariant, allowDownload: true, onProgress: report('es>pt') }),
-      getTranslator('pt', 'es', { ptVariant, allowDownload: true, onProgress: report('pt>es') }),
-    ];
-    if ('LanguageDetector' in globalThis) {
-      jobs.push(LanguageDetector.create({
-        expectedInputLanguages: ['es', 'pt'],
-        monitor(m) { m.addEventListener('downloadprogress', (e) => report('detector')(e.loaded)); },
-      }).then((d) => { detectorPromise = Promise.resolve(d); }));
-    }
-    await Promise.all(jobs);
+  // Downloads em falta segundo o último status(). Cada start() chama create() de imediato,
+  // por isso devem ser todos arrancados no próprio clique, sem await antes.
+  function downloadSteps(st) {
+    const pending = (a) => a === 'downloadable' || a === 'downloading';
+    const steps = [];
+    if (pending(st.esPt)) steps.push((onProgress) => createTranslator('es', st.ptTarget, onProgress));
+    if (pending(st.ptEs)) steps.push((onProgress) => createTranslator(st.ptTarget, 'es', onProgress));
+    if (pending(st.detector)) steps.push((onProgress) => createDetector(onProgress));
+    return steps;
   }
 
   async function status(ptVariant) {
@@ -167,5 +193,5 @@ globalThis.EsPtEngine ??= (() => {
     };
   }
 
-  return { EngineError, detect, translate, availability, downloadAll, status, resolvePt };
+  return { EngineError, detect, translate, availability, downloadSteps, status, resolvePt };
 })();
