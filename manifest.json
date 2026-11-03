@@ -20,7 +20,7 @@
   ],
   "commands": {
     "translate-selection": {
-      "suggested_key": { "default": "Alt+T", "mac": "MacCtrl+T" },
+      "suggested_key": { "default": "Alt+T" },
       "description": "Traduzir o texto selecionado"
     }
   },
