@@ -10,7 +10,7 @@ Extensão do Chrome que traduz o texto selecionado entre Espanhol e Português, 
 É preciso o Chrome 138 ou mais recente.
 
 ## Usar
-- Selecionar texto → botão direito → **Traduzir «…»**, ou o atalho **Alt+Shift+T** (alterável em `chrome://extensions/shortcuts`).
+- Selecionar texto → botão direito → **Traduzir «…»**, ou o atalho **Option+T** no Mac (**Alt+T** no Windows e Linux; alterável em `chrome://extensions/shortcuts`).
 - O sentido é detetado sozinho; **⇄** inverte-o.
 - **Copiar tradução** copia o texto; numa caixa de texto aparece também **Substituir pela tradução** (Cmd+Z desfaz).
 - ▶ lê o original ou a tradução em voz alta. Esc ou um clique fora fecha.
