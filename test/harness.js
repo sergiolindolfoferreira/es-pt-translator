@@ -12,12 +12,18 @@
     'pt>es': 'No sé a qué hora envían alertas de CASAFARI, voy a preguntar o pedir que vuelvan a enviar las alertas.',
   };
   let downloaded = state === 'available';
+  let inClick = false;
+  addEventListener('click', () => { inClick = true; setTimeout(() => { inClick = false; }); }, true);
 
   window.Translator = {
-    async availability() { return downloaded ? 'available' : state; },
+    async availability() {
+      await new Promise((r) => setTimeout(r, 5)); // ida e volta ao processo do browser
+      return downloaded ? 'available' : state;
+    },
     async create({ sourceLanguage, targetLanguage, monitor }) {
       if (!downloaded) {
-        if (!navigator.userActivation.isActive) throw new DOMException('Requires user activation', 'NotAllowedError');
+        // Como o Chrome: o download só é aceite se create() for chamado no próprio clique.
+        if (!inClick) throw new DOMException('Requires a user gesture when availability is "downloadable".', 'NotAllowedError');
         const target = new EventTarget();
         monitor?.(target);
         for (const p of [0.25, 0.6, 1]) {
